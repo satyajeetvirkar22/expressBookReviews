@@ -30,5 +30,7 @@ app.use('/customer/auth', (req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.use('/customer', customer_routes);
+// Also expose the assignment's documented /login endpoint at the root.
+app.use('/', customer_routes);
 app.use('/', genl_routes);
 app.listen(PORT, () => console.log('Server is running on port ' + PORT));
