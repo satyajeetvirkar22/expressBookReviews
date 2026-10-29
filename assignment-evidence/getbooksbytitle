@@ -1,5 +1,7 @@
 Command:
-curl -s 'http://localhost:5000/title/Things%20Fall%20Apart'
+curl.exe -s "http://localhost:5000/title/Pride%20and%20Prejudice"
 
 Output:
-[{"isbn":"1","author":"Chinua Achebe","title":"Things Fall Apart","reviews":{}}]
+[
+  { "isbn": "8", "author": "Jane Austen", "title": "Pride and Prejudice", "reviews": {} }
+]
