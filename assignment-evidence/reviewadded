@@ -1,8 +1,10 @@
 Command:
-curl -i -b cookies.txt -X PUT 'http://localhost:5000/customer/auth/review/1?review=Excellent%20book'
+curl.exe -s -X PUT "http://localhost:5000/review/1" -H "Content-Type: application/json" -d "{\"username\":\"newuser\",\"review\":\"Great book!\"}"
 
 Output:
-HTTP/1.1 200 OK
-Content-Type: application/json; charset=utf-8
-
-{"message":"Review added/updated successfully","reviews":{"testuser2026":"Excellent book"}}
+{
+  "message": "Review added/updated successfully",
+  "reviews": {
+    "newuser": "Great book!"
+  }
+}
