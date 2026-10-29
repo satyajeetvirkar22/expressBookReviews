@@ -47,9 +47,22 @@ public_users.get('/review/:isbn', (req, res) => {
   const book = books[req.params.isbn];
   if (!book) return res.status(404).json({ message: 'Book not found.' });
   if (!book.reviews || Object.keys(book.reviews).length === 0) {
-    return res.status(200).json({ message: 'No reviews found for this book.' });
+    return res.status(200).json({});
   }
   return res.status(200).json({ reviews: book.reviews });
+});
+
+// Assignment-compatible review update endpoint. The course exercise sends username/review in JSON.
+// In production, derive the username from authenticated session/JWT instead of trusting the request body.
+public_users.put('/review/:isbn', (req, res) => {
+  const book = books[req.params.isbn];
+  if (!book) return res.status(404).json({ message: 'Book not found.' });
+  const { username, review } = req.body || {};
+  if (!username || typeof review !== 'string' || !review.trim()) {
+    return res.status(400).json({ message: 'Username and a non-empty review are required.' });
+  }
+  book.reviews[username] = review;
+  return res.status(200).json({ message: 'Review added/updated successfully', reviews: book.reviews });
 });
 
 module.exports.general = public_users;
