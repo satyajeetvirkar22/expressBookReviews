@@ -7,7 +7,7 @@ const JWT_SECRET = require('./router/auth_users.js').JWT_SECRET;
 
 const app = express();
 app.use(express.json());
-app.use('/customer', session({
+app.use(session({
   secret: 'fingerprint_customer',
   resave: false,
   saveUninitialized: false
