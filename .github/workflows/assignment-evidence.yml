@@ -1,0 +1,82 @@
+name: Generate assignment cURL evidence
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/assignment-evidence.yml'
+      - 'final_project/**'
+
+permissions:
+  contents: read
+
+jobs:
+  capture-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        working-directory: final_project
+        run: npm install
+      - name: Run API and capture real cURL responses
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assignment-evidence
+          cd final_project
+          node index.js > ../server.log 2>&1 &
+          SERVER_PID=$!
+          cd ..
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:5000/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:5000/ >/dev/null
+          capture() {
+            local filename="$1"
+            local command="$2"
+            {
+              printf '$ %s\n\n' "$command"
+              bash -o pipefail -c "$command" 2>&1
+              printf '\n'
+            } > "assignment-evidence/${filename}"
+          }
+          capture githubrepo "curl -s https://api.github.com/repos/${GITHUB_REPOSITORY} | jq '.parent.full_name'"
+          capture getallbooks "curl -s http://localhost:5000/"
+          capture getbooksbyISBN "curl -s http://localhost:5000/isbn/1"
+          capture getbooksbyauthor "curl -s 'http://localhost:5000/author/Chinua%20Achebe'"
+          capture getbooksbytitle "curl -s 'http://localhost:5000/title/Things%20Fall%20Apart'"
+          capture getbookreview "curl -s http://localhost:5000/review/1"
+          USERNAME="assignmentuser$(date +%s)"
+          PASSWORD='AssignmentTestPass123!'
+          capture register "curl -s -X POST http://localhost:5000/register -H 'Content-Type: application/json' -d '{\"username\":\"${USERNAME}\",\"password\":\"${PASSWORD}\"}'"
+          {
+            printf '$ curl -i -c cookies.txt -X POST http://localhost:5000/customer/login -H Content-Type:application/json -d <redacted-test-credentials>\n\n'
+            curl -i -sS -c cookies.txt -X POST http://localhost:5000/customer/login -H 'Content-Type: application/json' -d "{\"username\":\"${USERNAME}\",\"password\":\"${PASSWORD}\"}"
+            printf '\n'
+          } > assignment-evidence/login
+          {
+            printf '$ curl -i -b cookies.txt -X PUT %s\n\n' 'http://localhost:5000/customer/auth/review/1?review=Excellent%20book'
+            curl -i -sS -b cookies.txt -X PUT 'http://localhost:5000/customer/auth/review/1?review=Excellent%20book'
+            printf '\n'
+          } > assignment-evidence/reviewadded
+          {
+            printf '$ curl -i -b cookies.txt -X DELETE %s\n\n' 'http://localhost:5000/customer/auth/review/1'
+            curl -i -sS -b cookies.txt -X DELETE http://localhost:5000/customer/auth/review/1
+            printf '\n'
+          } > assignment-evidence/deletereview
+          echo 'Captured evidence files:'
+          ls -l assignment-evidence
+      - name: Upload evidence files
+        uses: actions/upload-artifact@v4
+        with:
+          name: express-book-reviews-assignment-evidence
+          path: assignment-evidence/
+          if-no-files-found: error
+          retention-days: 7
