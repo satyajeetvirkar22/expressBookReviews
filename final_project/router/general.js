@@ -3,7 +3,57 @@ const books = require('./booksdb.js');
 const { isValid, users } = require('./auth_users.js');
 const public_users = express.Router();
 
-// Register a new user.
+// Helper functions returning Promises for Tasks 10-13 (Promise / async-await)
+const getAllBooksAsync = () => {
+  return new Promise((resolve, reject) => {
+    if (books) {
+      resolve(books);
+    } else {
+      reject({ status: 500, message: 'Unable to retrieve books.' });
+    }
+  });
+};
+
+const getBookByISBNAsync = (isbn) => {
+  return new Promise((resolve, reject) => {
+    const book = books[isbn];
+    if (book) {
+      resolve(book);
+    } else {
+      reject({ status: 404, message: 'Book not found.' });
+    }
+  });
+};
+
+const getBooksByAuthorAsync = (author) => {
+  return new Promise((resolve, reject) => {
+    const targetAuthor = decodeURIComponent(author).toLowerCase();
+    const matches = Object.entries(books)
+      .filter(([, book]) => String(book.author).toLowerCase() === targetAuthor)
+      .map(([isbn, book]) => ({ isbn, author: book.author, title: book.title, reviews: book.reviews }));
+    if (matches.length > 0) {
+      resolve(matches);
+    } else {
+      reject({ status: 404, message: 'No books found for this author.' });
+    }
+  });
+};
+
+const getBooksByTitleAsync = (title) => {
+  return new Promise((resolve, reject) => {
+    const targetTitle = decodeURIComponent(title).toLowerCase();
+    const matches = Object.entries(books)
+      .filter(([, book]) => String(book.title).toLowerCase() === targetTitle)
+      .map(([isbn, book]) => ({ isbn, author: book.author, title: book.title, reviews: book.reviews }));
+    if (matches.length > 0) {
+      resolve(matches);
+    } else {
+      reject({ status: 404, message: 'No books found with this title.' });
+    }
+  });
+};
+
+// Task 6: Register a new user
 public_users.post('/register', (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ message: 'Username and password are required.' });
@@ -12,37 +62,47 @@ public_users.post('/register', (req, res) => {
   return res.status(200).json({ message: 'User successfully registered. Now you can login' });
 });
 
-// Get all books.
-public_users.get('/', (req, res) => res.status(200).json(books));
-
-// Get book by ISBN.
-public_users.get('/isbn/:isbn', (req, res) => {
-  const book = books[req.params.isbn];
-  if (!book) return res.status(404).json({ message: 'Book not found.' });
-  return res.status(200).json(book);
+// Task 1 / Task 10: Get the book list available in the shop using async/await and Promises
+public_users.get('/', async (req, res) => {
+  try {
+    const bookList = await getAllBooksAsync();
+    return res.status(200).json(bookList);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || 'Error fetching books.' });
+  }
 });
 
-// Get books by exact author name (case-insensitive).
-public_users.get('/author/:author', (req, res) => {
-  const author = decodeURIComponent(req.params.author).toLowerCase();
-  const matches = Object.entries(books)
-    .filter(([, book]) => String(book.author).toLowerCase() === author)
-    .map(([isbn, book]) => ({ isbn, author: book.author, title: book.title, reviews: book.reviews }));
-  if (!matches.length) return res.status(404).json({ message: 'No books found for this author.' });
-  return res.status(200).json(matches);
+// Task 2 / Task 11: Get book details based on ISBN using async/await and Promises
+public_users.get('/isbn/:isbn', async (req, res) => {
+  try {
+    const book = await getBookByISBNAsync(req.params.isbn);
+    return res.status(200).json(book);
+  } catch (error) {
+    return res.status(error.status || 404).json({ message: error.message || 'Book not found.' });
+  }
 });
 
-// Get books by exact title (case-insensitive).
-public_users.get('/title/:title', (req, res) => {
-  const title = decodeURIComponent(req.params.title).toLowerCase();
-  const matches = Object.entries(books)
-    .filter(([, book]) => String(book.title).toLowerCase() === title)
-    .map(([isbn, book]) => ({ isbn, author: book.author, title: book.title, reviews: book.reviews }));
-  if (!matches.length) return res.status(404).json({ message: 'No books found with this title.' });
-  return res.status(200).json(matches);
+// Task 3 / Task 12: Get book details based on author using async/await and Promises
+public_users.get('/author/:author', async (req, res) => {
+  try {
+    const matchedBooks = await getBooksByAuthorAsync(req.params.author);
+    return res.status(200).json(matchedBooks);
+  } catch (error) {
+    return res.status(error.status || 404).json({ message: error.message || 'No books found for this author.' });
+  }
 });
 
-// Get reviews for a book.
+// Task 4 / Task 13: Get all books based on title using async/await and Promises
+public_users.get('/title/:title', async (req, res) => {
+  try {
+    const matchedBooks = await getBooksByTitleAsync(req.params.title);
+    return res.status(200).json(matchedBooks);
+  } catch (error) {
+    return res.status(error.status || 404).json({ message: error.message || 'No books found with this title.' });
+  }
+});
+
+// Task 5: Get book reviews based on ISBN
 public_users.get('/review/:isbn', (req, res) => {
   const book = books[req.params.isbn];
   if (!book) return res.status(404).json({ message: 'Book not found.' });
@@ -52,8 +112,7 @@ public_users.get('/review/:isbn', (req, res) => {
   return res.status(200).json({ reviews: book.reviews });
 });
 
-// Assignment-compatible review update endpoint. The course exercise sends username/review in JSON.
-// In production, derive the username from authenticated session/JWT instead of trusting the request body.
+// Assignment-compatible review update endpoint
 public_users.put('/review/:isbn', (req, res) => {
   const book = books[req.params.isbn];
   if (!book) return res.status(404).json({ message: 'Book not found.' });
@@ -65,4 +124,11 @@ public_users.put('/review/:isbn', (req, res) => {
   return res.status(200).json({ message: 'Review added/updated successfully', reviews: book.reviews });
 });
 
-module.exports.general = public_users;
+// Export helper Promise functions as well for direct testing if required
+module.exports = {
+  general: public_users,
+  getAllBooks: getAllBooksAsync,
+  getBooksByISBN: getBookByISBNAsync,
+  getBooksByAuthor: getBooksByAuthorAsync,
+  getBooksByTitle: getBooksByTitleAsync
+};
